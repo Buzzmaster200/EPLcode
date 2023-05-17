@@ -1,0 +1,25 @@
+from numpy import *
+from matplotlib import pyplot as plt
+L1=0.517e-3
+L2=0.715e-3
+tau1=L1/330
+tau2=L2/330
+C_G=0.5e-9
+Vcc=6
+G=lambda T: Vcc*(1/(1+exp(-T/(2*tau2))))
+P= lambda T : Vcc*(1/(1+exp(-T/(2*tau1)))-(1/(1+exp(-T/(2*tau2)))))
+R= linspace(100,100000, 10000)
+T=2*log(2)*C_G*R
+delta=P(T)
+tension=G(T)
+print("meilleur résistance",R[argmax(delta)])
+print("période associée",T[argmax(delta)])
+print("fréquence associée",1/T[argmax(delta)])
+print("valeur maximum du delta",max(delta))
+print("valeur maximum de la tension",G(T[argmax(delta)]))
+plt.figure()
+plt.plot(R,delta)
+plt.title("différence de tensions en fonction des résistances",fontsize=15)
+plt.xlabel("Résistance RG[Ω]",fontsize=15)
+plt.ylabel("ΔV[V]",fontsize=15)
+plt.show()
