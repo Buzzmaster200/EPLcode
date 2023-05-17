@@ -1,0 +1,234 @@
+from numpy import *
+from matplotlib import pyplot as plt
+n=1000
+t=linspace(0,50e-6, n)
+alimentation=5.5
+L1=0.517e-3
+L2=0.715e-3
+V_Z=4.3
+def trianglecharge(t,t0,T,A):
+    return (A/(T/2))*(t-t0)
+def triangledecharge(t,t0,T,A):
+    return A+(-A/(T/2))*(t-t0)
+def triangle():
+    chargement=True
+    t0=0
+    A=1
+    T=1/1000
+    R=0
+    V=zeros(len(t))
+    for i in range(n-1):
+        if R==0 :
+            if chargement :
+                chargement=False
+                t0=t[i]
+            if A+(-A/(T/2))*(t[i]-t0)>0:
+                V[i]=triangledecharge(t[i],t0,T,A)
+            else :
+                R=2
+                t0=t[i]
+                V[i]=trianglecharge(t[i],t0,T,A)
+                
+        else :
+            if not chargement :
+                chargement=True
+            if (A/(T/2))*(t[i]-t0)<=1:
+                V[i]=trianglecharge(t[i],t0,T,A)
+            else :
+                chargement=False
+                t0=t[i]
+                V[i]=triangledecharge(t[i],t0,T,A)
+                R=0
+    return V
+
+def superi():
+    V=triangle()
+    plt.figure()
+    plt.plot(t,V,label="$V_{out}$", color="b")
+    plt.xlabel("Temps[s]",fontsize=15)
+    plt.ylabel("Tension[V]",fontsize=15)
+    
+    plt.legend()
+    
+    plt.show()
+superi()            
+def inducharge(t,t_0, tau,Vmin):
+    return (alimentation-Vmin)*(1-exp(-(t-t_0)/tau)) +Vmin
+def indudecharge(t,t_0, tau,Vmax):
+    return Vmax*exp(-(t-t_0)/tau)
+def capacharge(t,t_0,tau):
+    return alimentation*(1-(2/3)*exp(-(t-t_0)/tau))
+def capadecharge(t,t_0,tau):
+    return alimentation*((2/3)*exp(-(t-t_0)/tau))
+def carré():
+    R=8152
+    C_G=0.5e-9
+    tau=C_G*R
+    T=2*log(2)*tau
+    print(T)
+    chargement=True
+    t_0=0
+    VS=zeros(len(t))
+    Vcap=zeros(len(t))
+    Vin=zeros(len(t))
+    Vin[0]=(2/3)*alimentation
+    Vcap[0]=(1/3)*alimentation
+    for i in range (n-1):
+        if Vcap[i]>Vin[i]:
+            if chargement :
+                chargement=False
+                t_0=t[i]
+            Vcap[i+1]=capadecharge(t[i+1],t_0,tau)
+            Vin[i+1]=(1/3)*alimentation
+            VS[i+1]=0
+        else :
+            if not chargement :
+                chargement=True
+                t_0=t[i]
+            Vcap[i+1]=capacharge(t[i+1],t_0,tau)
+            Vin[i+1]=(2/3)*alimentation
+            VS[i+1]=alimentation
+        
+    return VS, Vin, Vcap,T
+
+def graphecarre():
+    VS, Vin, Vcap,T=carré()
+    plt.figure()
+    plt.title("graphe des tensions du générateur de signal",fontsize=15)
+    plt.plot(t,VS,label="$V_{out}$", color="b")
+    plt.plot(t,Vin,label="$V_{in+}$", color="y")
+    plt.plot(t,Vcap,label="$V_{in-}$",color='r')
+    plt.xlabel("Temps[s]",fontsize=15)
+    plt.ylabel("Tension[V]",fontsize=15)
+    
+    plt.legend()
+    
+    plt.show()
+graphecarre()
+def inductance (VS,L,T):
+    tau=L/330
+    Vind=zeros(len(VS))
+    VL=zeros(len(VS))
+    t_0=0
+    Vmax=alimentation/(1+exp(-T/(2*tau)))
+    Vmin=Vmax*exp(-T/(2*tau))
+    VL[0]=Vmin
+    Vind[0]=Vmin
+    chargement=False
+    for i in range(n-1):
+        if VS[i]==alimentation:
+            if not chargement:
+                t_0=t[i]
+                chargement=True
+                
+                print(Vmin, Vmax)
+            Vind[i+1]=indudecharge(t[i+1],t_0, tau,Vmax)
+            VL[i+1]=inducharge(t[i+1],t_0, tau,Vmin)
+        else :
+            if chargement :
+                chargement=False
+                t_0=t[i]
+            Vind[i+1]=inducharge(t[i+1],t_0, tau,Vmin)
+            VL[i+1]=indudecharge(t[i+1],t_0, tau,Vmax)
+    
+    return VS,VL,Vind,Vmax
+def grapheindu():
+    VS, Vin, Vcap,T=carré()
+    VS,VL,Vind,Vmax=inductance(VS,L1,T)
+    VS1,VL1,Vind1,Vmax1=inductance(VS,L2,T)
+    plt.figure()
+    plt.title("graphe de la tension de sortie du bloc inductance",fontsize=15)
+    plt.plot(t,VS,label="$V_S$", color="y")
+    plt.plot(t,VL,label="$V_{L1} en l'absence du métal$", color="b")
+    plt.plot(t,VL1,label="$V_{L} en présence du métal$",color='r')
+    plt.xlabel("Temps[s]",fontsize=15)
+    plt.ylabel("Tension[V]",fontsize=15)
+    plt.legend()
+    plt.show()
+grapheindu()            
+def cretedecharge(t,t_0,V_0,tau):
+    return V_0*exp(-(t-t_0)/tau)
+
+def crete(VL,R):
+    C_det=1e-6
+    Rdet=R
+    tau1=C_det*Rdet
+    VC=zeros(len(VL))
+    VC[0]=2
+    t_0=0
+    chargement=False
+    V_0=2
+    for i in range(n-1):
+        if VC[i]>VL[i+1]:
+            if chargement :
+                t_0=t[i]
+                V_0=VC[i]
+                chargement=False
+            VC[i+1]=cretedecharge(t[i+1], t_0,V_0,tau1)
+        else :
+            if not chargement :
+                chargement=True
+                
+            VC[i+1]=VL[i+1]
+    return VC, VL
+def graphecrete():
+    VS, Vin, Vcap,T=carré()
+    VS,VL,Vind,Vmax=inductance(VS,L1,T)
+    V=triangle()
+    VC,VL=crete(V,1100)
+    Vt,Vn=crete(V,100000)
+    plt.figure()
+    plt.title("graphe théorique du détecteur de crêtes")
+    plt.plot(t,VC,label="$V_C R=1100$", color="y")
+    plt.plot(t,Vt,label="$V_C R=100000$", color="r")
+    plt.plot(t,VL,label="$V_{in+}$", color="b")
+    plt.xlabel("Temps[s]")
+    plt.ylabel("Tension[V]")
+    plt.legend()
+    plt.show()
+graphecrete()
+def soustracteur(VD):
+    R1=10000
+    R2=20000
+    R3=90000
+    R4=10000
+    alpha=(R3)/(R1)
+    beta=R2/R1
+    Vin=ones(n)*2
+    Vout=zeros(n)
+    Vout=(3)*Vin -VD*(beta)
+    return Vout, VD, Vin
+def graphesous():
+    VS, Vin, Vcap,T=carré()
+    VS,VL,Vind,Vmax=inductance(VS,L1,T)
+    Vout, VD, Vo=soustracteur(triangle())
+    plt.figure()
+    plt.title("graphe théorique du soustracteur",fontsize=15)
+    plt.plot(t,Vout,label="$V_{F}$", color="b")
+    plt.plot(t,VD,label="$V_C$", color="r")
+    plt.plot(t,Vo,label="$V_{sous}$", color="y")
+    plt.xlabel("Temps[s]",fontsize=15)
+    plt.ylabel("Tension[V]",fontsize=15)
+    plt.legend()
+    plt.show()
+graphesous()    
+def signaleur(VF):
+    Vref=3
+    Vout=zeros(n)
+    Vout[VF>Vref]=alimentation
+    return Vout,Vref*ones(n)
+def graphesign():
+    VS, Vin, Vcap,T=carré()
+    VS,VL,Vind,Vmax=inductance(VS,L1,T)
+    VC,VL=crete(VL)
+    Vout, VD, Vo=soustracteur(VC)
+    Vv,Vc=signaleur(Vout)
+    plt.figure()
+    plt.title("graphe signaleur")
+    plt.plot(t,Vout,label="$V_F$", color="y")
+    plt.plot(t,Vv,label="$V_out$", color="b")
+    plt.plot(t,Vc,label="$V_ref$", color="r")
+    plt.xlabel("Temps[s]")
+    plt.ylabel("Tension[V]")
+    plt.legend()
+    plt.show()
